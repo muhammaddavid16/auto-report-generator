@@ -1,0 +1,22 @@
+{
+    "compilerOptions": {
+        "target": "ES6",
+        "module": "CommonJS",
+        "lib": ["ES6"],
+        "outDir": "dist",
+        "declaration": true,
+        "declarationMap": true,
+        "emitDeclarationOnly": false,
+        "sourceMap": true,
+        "strict": true,
+        "noImplicitAny": true,
+        "strictNullChecks": true,
+        "strictFunctionTypes": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "moduleResolution": "node",
+        "esModuleInterop": true
+    },
+    "include": ["src"],
+    "exclude": ["node_modules", "dist", "storage"]
+}

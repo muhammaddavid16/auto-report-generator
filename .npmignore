@@ -1,0 +1,15 @@
+# Jangan publish folder source code TypeScript
+src/
+node_modules/
+storage/
+
+# Konfigurasi & build files yang tidak diperlukan di package
+.github/
+tsconfig.json
+package-lock.json
+
+# Ignore config editor dan sistem
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

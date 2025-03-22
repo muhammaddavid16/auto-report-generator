@@ -1,0 +1,37 @@
+{
+    "name": "@muhammaddavid16/auto-report-generator",
+    "version": "1.0.0",
+    "description": "Automated Report Generator for Automation Testing",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/muhammaddavid16/auto-report-generator.git"
+    },
+    "author": "muhammaddavid16",
+    "license": "ISC",
+    "scripts": {
+        "dev": "npx ts-node src/index.ts",
+        "build": "npx tsc",
+        "start": "node dist/index.js"
+    },
+    "publishConfig": {
+        "registry": "https://npm.pkg.github.com/"
+    },
+    "keywords": [
+        "report",
+        "automation",
+        "report-system"
+    ],
+    "dependencies": {
+        "date-fns": "^4.1.0",
+        "date-fns-tz": "^3.2.0",
+        "jspdf": "^3.0.0",
+        "jspdf-autotable": "^5.0.2"
+    },
+    "devDependencies": {
+        "@types/node": "^22.13.10",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.8.2"
+    }
+}
