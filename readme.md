@@ -22,7 +22,7 @@ npm install @muhammaddavid16/auto-report-generator
 ## 🚀 Usage Example
 
 ```typescript
-import { ReportGenerator, Project, TestStep } from "@muhammaddavid16/auto-report-generator";
+import { ReportGenerator, Project, TestCase } from "@muhammaddavid16/auto-report-generator";
 
 const project: Project = {
     name: "Oracle HRM",
@@ -33,24 +33,40 @@ const project: Project = {
     scenarioId: "SCN_Login",
 };
 
-const testSteps: TestStep[] = [
+const testCases: TestCase[] = [
     {
-        title: "Input login data",
-        description: "Enter username and password",
-        image_url: "path-to-image.jpeg",
-        status: "Done",
-        device: "web",
+        name: "SCN_001_TC_001",
+        steps: [
+            {
+                title: "Open Browser",
+                description: "Open Chrome browser.",
+                imageUrl: "images/step-1.jpg",
+                status: "Passed",
+                device: "web",
+            },
+        ],
     },
     {
-        title: "Login",
-        description: "System successfully logs in",
-        image_url: "path-to-image.jpeg",
-        status: "Passed",
-        device: "web",
+        name: "SCN_001_TC_002",
+        steps: [
+            {
+                title: "Input login data",
+                description: "Enter username and password.",
+                imageUrl: "images/step-2.jpg",
+                status: "Done",
+                device: "web",
+            },
+            {
+                title: "Login",
+                description: "System successfully logs in.",
+                imageUrl: "images/step-3.jpg",
+                status: "Passed",
+                device: "web",
+            },
+        ],
     },
 ];
-
-const reportGenerator: ReportGenerator = new ReportGenerator(project, testSteps, { filePath: "example.pdf" });
+const reportGenerator = new ReportGenerator(project, testCases, { filePath: `example.pdf` });
 reportGenerator.generateReport();
 ```
 

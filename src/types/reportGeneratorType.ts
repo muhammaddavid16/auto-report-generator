@@ -1,5 +1,6 @@
 export type TOCEntry = {
-    title: string;
+    title?: string;
+    step?: string;
     page: number;
 };
 
