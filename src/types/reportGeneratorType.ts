@@ -17,10 +17,17 @@ export type Project = {
     scenarioId: string;
 };
 
+export type TestStatus = "Done" | "Passed" | "Failed";
+
+export type TestCase = {
+    name: string;
+    step: TestStep[];
+};
+
 export type TestStep = {
     title: string;
     description: string;
     image_url: string;
-    status: "Done" | "Passed" | "Failed";
+    status: TestStatus;
     device: "web" | "mobile";
 };
