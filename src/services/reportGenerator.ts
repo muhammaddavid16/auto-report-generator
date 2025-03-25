@@ -2,7 +2,7 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { REPORT_CONFIG as config } from "../config/reportConfig";
 import { IReportGenerator } from "../interfaces/reportGeneratorInterface";
-import { Project, ReportGeneratorOptions, TestStep, TOCEntry } from "../types/reportGeneratorType";
+import { Project, ReportGeneratorOptions, TestCase, TOCEntry } from "../types/reportGeneratorType";
 import { globalUtil } from "../utils/globalUtil";
 import path from "path";
 
@@ -11,31 +11,43 @@ export class ReportGenerator implements IReportGenerator {
     private tocEntries: TOCEntry[];
     private totalTOCPage: number;
     private totalDocumentSummaryPage: number;
-    private createdAt: string;
 
-    constructor(private project: Project, private testSteps: TestStep[], private options?: ReportGeneratorOptions) {
+    constructor(private project: Project, private testCases: TestCase[], private options?: ReportGeneratorOptions) {
         this.doc = new jsPDF({ orientation: "p", unit: "mm", format: [config.pageWidth, config.pageHeight] });
 
-        const totalTestStep = this.testSteps.length;
-        this.totalTOCPage = Math.ceil((totalTestStep + 2 - 43) / 45) + 1;
-        this.totalDocumentSummaryPage = Math.ceil((totalTestStep - 40) / 46) + 1;
+        const totalContent = this.testCases.reduce((totalContent, { step }) => totalContent + 1 + step.length, 0);
+        this.totalTOCPage = Math.ceil((totalContent + 2 - 43) / 47) + 1;
+
+        const totalSummary = this.testCases.reduce((totalContent, { step }) => totalContent + step.length, 0);
+        this.totalDocumentSummaryPage = Math.ceil((totalSummary - 42) / 47) + 1;
+
         this.tocEntries = [
             { title: "Table of Content", page: 1 },
             { title: "Document Summary", page: this.totalTOCPage + 1 },
         ];
 
-        // Add test steps to TOC
-        let stepIndex = 1;
-        let pageNumber = this.totalTOCPage + this.totalDocumentSummaryPage + 1;
-        this.testSteps.forEach((step, i) => {
-            if (stepIndex > 2) {
-                pageNumber++;
-                stepIndex = 1;
+        let page = this.totalTOCPage + this.totalDocumentSummaryPage + 1;
+        let index = 1;
+        testCases.forEach((testCase, i) => {
+            testCase.step.forEach((step, j) => {
+                if (index > 2) {
+                    page++;
+                    index = 1;
+                }
+                if (j === 0) {
+                    // Add Title
+                    this.tocEntries.push({ title: testCase.name, page: page });
+                }
+                // Add Subtitle
+                const txt = `${j + 1}. ${step.title}`;
+                this.tocEntries.push({ step: globalUtil.padText(txt, txt.length + 4, " ", "right"), page: page });
+                index++;
+            });
+            if (i !== testCases.length - 1 && index === 2) {
+                page++;
+                index = 1;
             }
-            this.tocEntries.push({ title: `${i + 1}. ${step.title}`, page: pageNumber });
-            stepIndex++;
         });
-        this.createdAt = globalUtil.generateDate(0, "dd-MM-yyyy_HH:mm:ss");
     }
 
     private addImage(
@@ -85,7 +97,6 @@ export class ReportGenerator implements IReportGenerator {
             ["Author", this.project.author],
             ["Tools", this.project.tool],
             ["Scenario Id", this.project.scenarioId],
-            ["Date", this.createdAt],
         ];
         autoTable(this.doc, {
             body,
@@ -96,7 +107,8 @@ export class ReportGenerator implements IReportGenerator {
                 font: "times",
                 fontStyle: "italic",
                 fontSize: 10,
-                cellPadding: { horizontal: 2.5, vertical: 0.2 },
+                textColor: [0, 0, 0],
+                cellPadding: { horizontal: 2, vertical: 0.2 },
                 lineColor: [0, 0, 0],
             },
             columnStyles: { 0: { cellWidth: 30 } },
@@ -219,7 +231,7 @@ export class ReportGenerator implements IReportGenerator {
         this.addPage();
     }
 
-    private generateTOC(): void {
+    private generateTOCEntries(): void {
         let page = 2;
         this.doc.setPage(page);
 
@@ -228,7 +240,7 @@ export class ReportGenerator implements IReportGenerator {
         this.doc.setFont(config.fontFamily.helvetica, config.fontStyle.bold);
         this.doc.setFontSize(config.fontSize.subtitle);
         const { w: titleWidth, h: titleHeight } = this.doc.getTextDimensions(title);
-        this.doc.text(title, (config.pageWidth - titleWidth) / 2, 44);
+        this.doc.text(title, (config.pageWidth - titleWidth) / 2, 37);
 
         // Add table of content
         this.doc.setFont(config.fontFamily.times, config.fontStyle.normal);
@@ -238,8 +250,8 @@ export class ReportGenerator implements IReportGenerator {
         let numberIndex = 1;
         this.tocEntries.forEach((entry: TOCEntry) => {
             const padding = config.pageWidth - config.marginX * 2;
-            const listContent = this.generateFormattedLine(entry.title, padding, ".", entry.page);
-            const currentLine = (page === 2 ? 44 + titleHeight : 34) + (tocHeight + config.lineHeight) * numberIndex;
+            const listContent = this.generateFormattedLine(entry.title ?? entry.step ?? "", padding, ".", entry.page);
+            const currentLine = (page === 2 ? 35 + titleHeight : 25) + (tocHeight + config.lineHeight) * numberIndex;
             this.doc.textWithLink(listContent, config.marginX, currentLine, {
                 pageNumber: entry.page + 1,
             });
@@ -264,20 +276,21 @@ export class ReportGenerator implements IReportGenerator {
         this.doc.setFont(config.fontFamily.helvetica, config.fontStyle.bold);
         this.doc.setFontSize(config.fontSize.subtitle);
         const { w: titleWidth, h: titleHeight } = this.doc.getTextDimensions(title);
-        this.doc.text(title, (config.pageWidth - titleWidth) / 2, 44);
+        this.doc.text(title, (config.pageWidth - titleWidth) / 2, 37);
 
         // Add status table
         const statusHeader = [["Total Passed", "Total Failed", "Total Done", "Total"]];
-        const passedTotal = this.testSteps.filter((step) => step.status === "Passed").length;
-        const failedTotal = this.testSteps.filter((step) => step.status === "Failed").length;
-        const doneTotal = this.testSteps.filter((step) => step.status === "Done").length;
-        const total = this.testSteps.length;
+        const totalStep = this.testCases.flatMap((tc) => tc.step);
+        const passedTotal = totalStep.reduce((total, step) => total + (step.status === "Passed" ? 1 : 0), 0);
+        const failedTotal = totalStep.reduce((total, step) => total + (step.status === "Failed" ? 1 : 0), 0);
+        const doneTotal = totalStep.reduce((total, step) => total + (step.status === "Done" ? 1 : 0), 0);
+        const total = totalStep.length;
         const statusBody = [[passedTotal, failedTotal, doneTotal, total]];
         autoTable(this.doc, {
             head: statusHeader,
             body: statusBody,
             horizontalPageBreak: true,
-            startY: 44 + titleHeight,
+            startY: 37 + titleHeight,
             margin: { horizontal: config.marginX },
             theme: "grid",
             headStyles: {
@@ -302,14 +315,24 @@ export class ReportGenerator implements IReportGenerator {
             },
         });
 
-        // Add step table
-        const stepHeader = [["Step Name", "Status"]];
-        const stepBody = this.testSteps.map((step: TestStep, i: number) => [`${i + 1}. ${step.title}`, step.status]);
+        // Add Test Case table
+        const stepHeader = [["Test Case Name", "Test Case Step", "Status"]];
+        const stepBody = this.testCases.flatMap((testCase) =>
+            testCase.step.map((step, i) => [i === 0 ? testCase.name : "", `${i + 1}. ${step.title}`, step.status]),
+        );
+
+        // TC Name Summary
+        const TcNames = this.tocEntries.filter((entry) => entry.title);
+        let TcNameIndex = 2;
+
+        // TC Step Summary
+        const TcSteps = this.tocEntries.filter((entry) => entry.step);
+        let TcStepIndex = 0;
         autoTable(this.doc, {
             head: stepHeader,
             body: stepBody,
-            startY: 44 + titleHeight + 15,
-            margin: { horizontal: config.marginX, top: 38, bottom: config.marginY + 10 },
+            startY: 37 + titleHeight + 15,
+            margin: { horizontal: config.marginX, top: 34, bottom: config.marginY + 10 },
             theme: "grid",
             headStyles: {
                 fillColor: [130, 130, 130],
@@ -323,13 +346,15 @@ export class ReportGenerator implements IReportGenerator {
                 font: "times",
                 fontStyle: "normal",
                 fontSize: 10,
-                cellPadding: { horizontal: 2.5, vertical: 0.5 },
+                cellPadding: { horizontal: 1.5, vertical: 0.5 },
                 lineColor: [0, 0, 0],
             },
-            columnStyles: { 1: { cellWidth: 30 } },
+            columnStyles: { 0: { cellWidth: 55 }, 1: { cellWidth: "auto" }, 2: { cellWidth: "wrap" } },
             didParseCell: (data) => {
-                // Set status color
-                if (data.section === "body" && data.column.index === 1) {
+                if (data.section === "body" && data.column.index === 0) {
+                    data.cell.styles.fontStyle = "bold";
+                }
+                if (data.section === "body" && data.column.index === 2) {
                     data.cell.styles.fontStyle = "bold";
                     data.cell.styles.halign = "center";
                     if (data.cell.raw === "Passed") data.cell.styles.textColor = [0, 128, 0];
@@ -337,11 +362,17 @@ export class ReportGenerator implements IReportGenerator {
                 }
             },
             didDrawCell: (data) => {
-                // Add link
-                if (data.section === "body" && data.column.index === 0) {
+                if (data.section === "body" && data.column.index === 0 && data.cell.raw !== "") {
                     this.doc.link(data.cell.x, data.cell.y, data.cell.width, data.cell.height, {
-                        pageNumber: this.tocEntries[data.row.index + 2].page + 1,
+                        pageNumber: TcNames[TcNameIndex].page + 1,
                     });
+                    TcNameIndex++;
+                }
+                if (data.section === "body" && data.column.index === 1) {
+                    this.doc.link(data.cell.x, data.cell.y, data.cell.width, data.cell.height, {
+                        pageNumber: TcSteps[TcStepIndex].page + 1,
+                    });
+                    TcStepIndex++;
                 }
             },
             didDrawPage: (data) => {
@@ -353,57 +384,76 @@ export class ReportGenerator implements IReportGenerator {
         });
     }
 
-    private generateTestStep(): void {
-        let currentY = 40;
+    private generateTestCase(): void {
+        let currentY = 36;
         let stepCount = 0;
         const maxWidth = config.pageWidth - config.marginX * 2;
 
-        this.testSteps.forEach((step, i) => {
-            if (stepCount > 1) {
+        this.testCases.forEach((testCase, i) => {
+            testCase.step.forEach((step, j) => {
+                if (stepCount > 1) {
+                    this.addPage();
+                    currentY = 36;
+                    stepCount = 0;
+                }
+
+                if (j === 0) {
+                    // Set title font
+                    this.doc.setFont(config.fontFamily.times, config.fontStyle.bold);
+                    this.doc.setFontSize(config.fontSize.subtitle);
+
+                    // Add title
+                    const titleWidth = this.doc.getTextWidth(testCase.name);
+                    this.doc.text(testCase.name, (config.pageWidth - titleWidth) / 2, currentY, { maxWidth });
+                    const { h: titleHeight } = this.doc.getTextDimensions(step.title);
+                    currentY += titleHeight + 2;
+                }
+
+                // Highlight status
+                if (step.status === "Passed") this.doc.setTextColor(0, 128, 0);
+                if (step.status === "Failed") this.doc.setTextColor(255, 0, 0);
+
+                // Set title font
+                this.doc.setFont(config.fontFamily.times, config.fontStyle.bold);
+                this.doc.setFontSize(config.fontSize.text);
+
+                // Add subtitle
+                this.doc.text(`${j + 1}. ${step.title}`, config.marginX, currentY, { maxWidth });
+                const { h: subTitleHeight } = this.doc.getTextDimensions(step.title);
+                currentY += subTitleHeight;
+
+                // Add image
+                switch (step.device) {
+                    case "mobile":
+                        const height = 88;
+                        const newImageMobileSize = this.addTestStepImage(step.image_url, "height", height, currentY);
+                        currentY += newImageMobileSize.h + 5;
+                        break;
+                    default:
+                        const newImageWebSize = this.addTestStepImage(
+                            step.image_url,
+                            "width",
+                            config.pageWidth - config.marginX * 2,
+                            currentY,
+                        );
+                        currentY += newImageWebSize.h + 5;
+                        break;
+                }
+
+                // Add description
+                this.doc.setTextColor(0, 0, 0);
+                this.doc.setFont(config.fontFamily.times, config.fontStyle.normal);
+                this.doc.setFontSize(config.fontSize.sm);
+                this.doc.text(step.description, config.marginX, currentY, { maxWidth });
+
+                currentY += 20;
+                stepCount++;
+            });
+            if ((i !== this.testCases.length - 1 && stepCount) === 1) {
                 this.addPage();
-                currentY = 40;
+                currentY = 35;
                 stepCount = 0;
             }
-
-            // Highlight status
-            if (step.status === "Passed") this.doc.setTextColor(0, 128, 0);
-            if (step.status === "Failed") this.doc.setTextColor(255, 0, 0);
-
-            // Set title font
-            this.doc.setFont(config.fontFamily.times, config.fontStyle.bold);
-            this.doc.setFontSize(config.fontSize.text);
-
-            // Add title
-            this.doc.text(`${i + 1}. ${step.title}`, config.marginX, currentY, { maxWidth });
-            const { h: titleHeight } = this.doc.getTextDimensions(step.title);
-            currentY += titleHeight;
-
-            // Add image
-            switch (step.device) {
-                case "mobile":
-                    const height = 88;
-                    const newImageMobileSize = this.addTestStepImage(step.image_url, "height", height, currentY);
-                    currentY += newImageMobileSize.h + 5;
-                    break;
-                default:
-                    const newImageWebSize = this.addTestStepImage(
-                        step.image_url,
-                        "width",
-                        config.pageWidth - config.marginX * 2,
-                        currentY,
-                    );
-                    currentY += newImageWebSize.h + 5;
-                    break;
-            }
-
-            // Add description
-            this.doc.setTextColor(0, 0, 0);
-            this.doc.setFont(config.fontFamily.times, config.fontStyle.normal);
-            this.doc.setFontSize(config.fontSize.sm);
-            this.doc.text(step.description, config.marginX, currentY, { maxWidth });
-
-            currentY += 20;
-            stepCount++;
         });
     }
 
@@ -417,8 +467,8 @@ export class ReportGenerator implements IReportGenerator {
     public generateReport(): void {
         this.generateCover();
         this.createAllPage();
-        this.generateTestStep();
-        this.generateTOC();
+        this.generateTestCase();
+        this.generateTOCEntries();
         this.generateDocumentSummary();
         this.addPageNumber();
         this.generatePdf();

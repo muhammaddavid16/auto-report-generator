@@ -3,7 +3,12 @@ import { formatInTimeZone } from "date-fns-tz";
 import { existsSync, mkdirSync, readFileSync } from "fs";
 
 export class globalUtil {
-    public static padText(text: string, length: number, char = " ", align = "left"): string {
+    public static padText(
+        text: string,
+        length: number,
+        char = " ",
+        align = "left" as "left" | "right" | "center",
+    ): string {
         if (text.length >= length) return text;
 
         const padding = length - text.length;
